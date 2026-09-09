@@ -22,12 +22,12 @@
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
-        <a class="brand-logo" href="https://github.com/banana2556/hme-manager" target="_blank" rel="noopener" aria-label="專案 GitHub">
+        <a class="brand-logo" href="https://github.com/WW-shan/hme-manager" target="_blank" rel="noopener" aria-label="專案 GitHub">
           <img src="/static/logo.svg" width="38" height="38" alt="HME Manager logo">
         </a>
         <div class="brand-meta">
-          <a class="brand-name" href="https://github.com/banana2556/hme-manager" target="_blank" rel="noopener">HME Manager</a>
-          <a class="brand-author" href="https://github.com/banana2556" target="_blank" rel="noopener">@banana2556</a>
+          <a class="brand-name" href="https://github.com/WW-shan/hme-manager" target="_blank" rel="noopener">HME Manager</a>
+          <a class="brand-author" href="https://github.com/WW-shan" target="_blank" rel="noopener">@WW-shan</a>
         </div>
       </div>
       <nav class="nav">
@@ -237,6 +237,20 @@
               </div>
             </section>
           </div>
+          <section class="card browser-agent-card">
+            <div class="browser-agent-heading">
+              <div>
+                <h3>服务器浏览器自动导入</h3>
+                <p class="card-hint">登录只在服务器浏览器中完成；Apple 密码、2FA 和验证码不会传给 HME Manager。登录后打开 Hide My Email，Session 会自动捕获并导入。</p>
+              </div>
+              <span id="browserAgentBadge" class="status-badge warn">未检查</span>
+            </div>
+            <div id="browserAgentStatus" class="auto-refresh-info">正在读取浏览器 agent 状态…</div>
+            <div class="actions">
+              <a id="browserOpenLink" class="button-link primary" href="#" target="_blank" rel="noopener" hidden>打开服务器浏览器（noVNC）</a>
+              <button id="browserAgentRefreshBtn" type="button">刷新浏览器状态</button>
+            </div>
+          </section>
           <section class="card import-card">
             <h3>手動匯入 Session</h3>
             <ol class="card-hint import-steps">

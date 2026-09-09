@@ -7,7 +7,7 @@ ENV HME_STATE_DIR=/data/state
 
 WORKDIR /app
 
-COPY api_service.py hme.py icloud_web_session.py session_import.py web_app.py ./
+COPY api_service.py auto_refresh.py hme.py icloud_mail.py icloud_web_session.py session_import.py web_app.py ./
 COPY static/ ./static/
 
 RUN mkdir -p /data/state

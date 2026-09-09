@@ -167,14 +167,16 @@ class WebAppTests(unittest.TestCase):
         # logo / favicon, theme toggle, author link
         self.assertIn('rel="icon"', html)
         self.assertIn("/static/logo.svg", html)
-        self.assertIn('<a class="brand-name" href="https://github.com/banana2556/hme-manager"', html)
+        self.assertIn('<a class="brand-name" href="https://github.com/WW-shan/hme-manager"', html)
         self.assertIn('id="themeToggle"', html)
         self.assertLess(html.index('id="themeToggle"'), html.index('id="logoutBtn"'))
         self.assertIn('id="status" class="sr-only"', html)
         self.assertNotIn('class="status-chip"', html)
         self.assertIn('id="sessionMiniStatus"', html)
         self.assertIn('class="logout-label"', html)
-        self.assertIn("github.com/banana2556", html)
+        self.assertIn("github.com/WW-shan", html)
+        self.assertIn("browserAgentStatus", html)
+        self.assertIn("browserOpenLink", html)
         # no baked-in default secret in the served page
         self.assertNotIn("dev-secret", html)
 
@@ -548,6 +550,21 @@ class WebAppTests(unittest.TestCase):
             manager=FakeManager(), api_key="secret",
         )
         self.assertEqual(status, HTTPStatus.UNAUTHORIZED)
+
+    def test_dispatch_private_api_reports_browser_agent_status(self):
+        status, payload = dispatch_private_api(
+            "GET",
+            "/v1/browser/status",
+            headers={"X-API-Key": "secret"},
+            body=b"",
+            manager=FakeManager(),
+            api_key="secret",
+        )
+
+        self.assertEqual(status, HTTPStatus.OK)
+        self.assertTrue(payload["data"]["configured"])
+        self.assertFalse(payload["data"]["running"])
+        self.assertEqual(payload["data"]["publicPort"], "7900")
 
 
 if __name__ == "__main__":

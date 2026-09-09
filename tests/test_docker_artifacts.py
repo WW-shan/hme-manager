@@ -33,6 +33,18 @@ class DockerArtifactTests(unittest.TestCase):
         self.assertNotIn("/data/hme-config.json:ro", compose)
         self.assertNotIn("HME_DISABLE_BROWSER_LOGIN=1", compose)
 
+    def test_browser_agent_is_built_from_this_repository(self):
+        dockerfile = (ROOT / "Dockerfile.browser").read_text(encoding="utf-8")
+        requirements = (ROOT / "browser-agent-requirements.txt").read_text(encoding="utf-8")
+        compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
+
+        self.assertIn("browser_agent.py", dockerfile)
+        self.assertIn("selenium", requirements)
+        self.assertIn("hme-browser-agent", compose)
+        self.assertIn("Dockerfile.browser", compose)
+        self.assertIn("/data/state/browser-agent.json", compose)
+        self.assertIn("hme-browser-profile", compose)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import hmac
+import json
+import os
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -44,6 +47,42 @@ def refresh_session(source: Any) -> dict[str, Any]:
     if hasattr(source, "refresh_via_validate"):
         return ok_response(source.refresh_via_validate())
     return ok_response(source.check())
+
+
+def browser_status(manager: Any) -> dict[str, Any]:
+    """Expose only the browser agent's non-secret health snapshot."""
+    path = Path(manager.state_dir) / "browser-agent.json"
+    data: dict[str, Any] = {}
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            data = loaded
+    except (OSError, json.JSONDecodeError):
+        data = {}
+
+    allowed = (
+        "phase",
+        "updatedAt",
+        "lastImportAt",
+        "sessionValid",
+        "needsReauth",
+        "region",
+        "lastError",
+    )
+    result = {key: data[key] for key in allowed if key in data}
+    try:
+        updated_at = float(data.get("updatedAt") or 0)
+    except (TypeError, ValueError):
+        updated_at = 0
+    result["configured"] = str(os.environ.get("HME_BROWSER_AGENT_ENABLED", "1")).lower() not in {"0", "false", "no"}
+    result["running"] = bool(updated_at and time.time() - updated_at < 180)
+    result["publicUrl"] = str(os.environ.get("HME_BROWSER_PUBLIC_URL", "") or "").strip()
+    result["publicPort"] = str(os.environ.get("HME_BROWSER_WEB_PORT", "7900") or "7900").strip()
+    if result.get("lastError") is None:
+        result.pop("lastError", None)
+    elif "lastError" in result:
+        result["lastError"] = " ".join(str(result["lastError"]).split())[:300]
+    return ok_response(result)
 
 
 def import_session(manager: Any, payload: Mapping[str, Any]) -> dict[str, Any]:

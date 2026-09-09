@@ -5,8 +5,48 @@ services:
       - "8000:8000"
     environment:
       - HME_API_KEY=${HME_API_KEY:?HME_API_KEY must be set — see .env.example}
+      - HME_BROWSER_WEB_PORT=${HME_BROWSER_WEB_PORT:-7900}
       - ICLOUD_HME_CONFIG=/data/hme-config.json
       - HME_STATE_DIR=/data/state
     volumes:
       - ./data:/data
     restart: unless-stopped
+
+  hme-browser:
+    image: selenium/standalone-chromium:latest
+    shm_size: "2gb"
+    ports:
+      - "${HME_BROWSER_BIND_HOST:-127.0.0.1}:${HME_BROWSER_WEB_PORT:-7900}:7900"
+    expose:
+      - "4444"
+    environment:
+      - SE_VNC_PASSWORD=${HME_BROWSER_VNC_PASSWORD:?HME_BROWSER_VNC_PASSWORD must be set}
+      - SE_NODE_MAX_SESSIONS=1
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+      - SE_NODE_SESSION_TIMEOUT=${HME_BROWSER_SESSION_TIMEOUT:-1800}
+    volumes:
+      - hme-browser-profile:/home/seluser
+    restart: unless-stopped
+
+  hme-browser-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.browser
+    environment:
+      - HME_MANAGER_URL=http://hme-api:8000
+      - HME_MANAGER_API_KEY=${HME_API_KEY:?HME_API_KEY must be set}
+      - HME_BROWSER_STATUS_FILE=/data/state/browser-agent.json
+      - HME_BROWSER_PROFILE_DIR=/home/seluser/chrome-profile
+      - SELENIUM_URL=http://hme-browser:4444
+      - ICLOUD_WEB_URL=${ICLOUD_WEB_URL:-https://www.icloud.com/icloudplus/}
+      - HME_BROWSER_CHECK_INTERVAL=${HME_BROWSER_CHECK_INTERVAL:-60}
+      - HME_BROWSER_CAPTURE_TIMEOUT=${HME_BROWSER_CAPTURE_TIMEOUT:-600}
+    volumes:
+      - ./data:/data
+    depends_on:
+      - hme-api
+      - hme-browser
+    restart: unless-stopped
+
+volumes:
+  hme-browser-profile:

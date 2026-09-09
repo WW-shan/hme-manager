@@ -34,6 +34,10 @@ const autoRefreshEnabledEl = $("autoRefreshEnabled");
 const autoRefreshIntervalEl = $("autoRefreshInterval");
 const autoRefreshStatusEl = $("autoRefreshStatus");
 const sessionRegionEl = $("sessionRegion");
+const browserAgentBadgeEl = $("browserAgentBadge");
+const browserAgentStatusEl = $("browserAgentStatus");
+const browserOpenLinkEl = $("browserOpenLink");
+const browserAgentRefreshBtnEl = $("browserAgentRefreshBtn");
 const mailFolderSelect = $("mailFolderSelect");
 const mailAliasSelect = $("mailAliasSelect");
 const mailListEl = $("mailList");
@@ -49,6 +53,7 @@ let lastAliasSyncAt = null;
 let lastSessionRefreshAt = null;
 let lastAutoRefresh = null;
 let autoRefreshCountdownTimer = null;
+let browserStatusTimer = null;
 let currentOperation = "list";
 let currentView = "aliases";
 let mailFolders = [];
@@ -200,7 +205,7 @@ function showView(name) {
   if (aliasCountSub) aliasCountSub.hidden = currentView !== "aliases";
   window.location.hash = currentView;
   if (currentView === "aliases") { renderAliases(); refreshAliasTable(); }
-  if (currentView === "session") { loadStatus(); loadAutoRefresh(); }
+  if (currentView === "session") { loadStatus(); loadAutoRefresh(); loadBrowserStatus(); }
   if (currentView === "inbox" && !inboxLoadedOnce) { inboxLoadedOnce = true; initInbox(); }
 }
 
@@ -274,6 +279,63 @@ function renderSessionInfo(status = lastSessionStatus) {
   sessionMiniStatusEl.title = sessionMiniText;
   sessionDotEl.className = `dot ${stateKind}`;
   sessionIndicatorEl.className = `session-indicator ${stateKind}`;
+}
+
+// ---------- server browser agent ----------
+function browserPublicUrl(data) {
+  if (data && data.publicUrl) return String(data.publicUrl);
+  if (!window.location.hostname) return "";
+  const scheme = window.location.protocol === "https:" ? "https:" : "http:";
+  const port = String((data && data.publicPort) || "7900").replace(/[^0-9]/g, "") || "7900";
+  return `${scheme}//${window.location.hostname}:${port}`;
+}
+
+function renderBrowserStatus(data = {}) {
+  const configured = data.configured !== false;
+  const running = data.running === true;
+  const valid = data.sessionValid === true && data.needsReauth !== true;
+  let kind = "warn";
+  let label = configured ? "等待登录" : "未启用";
+  if (!configured) kind = "bad";
+  else if (running && valid) { kind = "ok"; label = "Session 有效"; }
+  else if (running) { kind = "warn"; label = "等待登录/导入"; }
+  else if (data.phase === "browser_unavailable") { kind = "bad"; label = "浏览器离线"; }
+  if (browserAgentBadgeEl) {
+    browserAgentBadgeEl.className = `status-badge ${kind}`;
+    browserAgentBadgeEl.textContent = label;
+  }
+  if (browserAgentStatusEl) {
+    const parts = [
+      running ? `agent 在线（${data.phase || "运行中"}）` : "agent 尚未上报状态",
+      data.lastImportAt ? `最近导入 ${formatSessionTime(data.lastImportAt)}` : "尚未自动导入",
+    ];
+    if (data.region) parts.push(`区域 ${data.region}`);
+    if (data.lastError) parts.push(`提示：${String(data.lastError)}`);
+    browserAgentStatusEl.textContent = parts.join(" · ");
+  }
+  if (browserOpenLinkEl) {
+    const url = browserPublicUrl(data);
+    browserOpenLinkEl.hidden = !url || !configured;
+    browserOpenLinkEl.href = url || "#";
+  }
+}
+
+async function loadBrowserStatus() {
+  try {
+    const response = await fetch("/v1/browser/status", { headers: apiHeaders() });
+    if (response.status === 401) { showModal(); return null; }
+    const data = await response.json();
+    if (response.ok && data.ok && data.data) renderBrowserStatus(data.data);
+    return data;
+  } catch (error) {
+    renderBrowserStatus({ configured: true, running: false, phase: "browser_unavailable", lastError: "无法读取 agent 状态" });
+    return null;
+  }
+}
+
+function startBrowserStatusPolling() {
+  if (browserStatusTimer !== null) window.clearInterval(browserStatusTimer);
+  browserStatusTimer = window.setInterval(loadBrowserStatus, 30000);
 }
 
 // ---------- auto refresh ----------
@@ -1108,6 +1170,7 @@ $("refreshSessionBtn").addEventListener("click", () => runSelectedOperation("ref
 $("saveAutoRefreshBtn").addEventListener("click", saveAutoRefreshSettings);
 $("runAutoRefreshBtn").addEventListener("click", runAutoRefreshNow);
 $("importSubmitBtn").addEventListener("click", submitImportSession);
+if (browserAgentRefreshBtnEl) browserAgentRefreshBtnEl.addEventListener("click", loadBrowserStatus);
 
 // ---------- theme toggle ----------
 const THEME_KEY = "hme-theme";
@@ -1140,6 +1203,8 @@ function init() {
   showView(VIEW_TITLES[initialView] ? initialView : "aliases");
   loadAutoRefresh();
   loadStatus();
+  loadBrowserStatus();
+  startBrowserStatusPolling();
   // Warm the mail cache in the background even before the inbox is opened,
   // then keep polling for new messages globally.
   if (!inboxLoadedOnce) { inboxLoadedOnce = true; initInbox(); }

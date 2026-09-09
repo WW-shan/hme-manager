@@ -26,7 +26,7 @@ web
 
 ## Operating Context
 
-- Session 取得儀式：在 iCloud 網頁開啟「郵件」與 Hide My Email，DevTools → Network → 對 `/v2/hme/list` 請求 Copy as cURL（或匯出 HAR），貼進後台導入。cookie 會過期（PCS-Mail 授權更快），過期就重複此儀式。
+- Session 取得儀式：可在服務器 noVNC 瀏覽器中由帳號所有者完成 iCloud 登入/2FA，agent 自動捕獲 `/v2/hme/list` 並導入；也保留 DevTools → Network → Copy as cURL/HAR 的手動入口。cookie 會過期（PCS-Mail 授權更快），過期時 agent 再次等待人工驗證。
 - 自動刷新每 10 分鐘用 `/v2/hme/list` 保活；401/403/421 視為授權失效，自動停用並要求重新導入。
 - 上游是 Apple 私有 API（`pNN-maildomainws` 的 HME 端點、`pNN-mailws` 的 JSON-RPC 與 raw RFC822 通道、setup 服務的主機解析），無文件、會漂移；郵件分區與 HME 分區不一定相同。
 - 部署：本機 `python web_app.py`、Docker、Render 三選一；所有 `/v1/*` 以 `HME_API_KEY`（X-API-Key）保護。
@@ -43,7 +43,7 @@ web
 
 其他必須尊重的產品事實：
 
-- Session cookie 是最高機密：不進 git（`hme-config.json`、`state/` 已 gitignore）、不寫進日誌與錯誤訊息。
+- Session cookie 是最高機密：不進 git（`hme-config.json`、`state/` 已 gitignore）、不寫進日誌與錯誤訊息；瀏覽器 profile 只保存在服務器持久化 volume。
 - 郵件功能是唯讀的；不提供寄信、刪信、標記。
 - Apple 端不可控：解析要容錯（欄位拼寫漂移、payload 形狀變化），session 失效要誠實回報（`SESSION_MISSING` / `SESSION_EXPIRED`）並指出重新導入的路徑。
 
@@ -54,7 +54,7 @@ web
 
 ## Brand Commitments
 
-名稱 **HME Manager**；GitHub `banana2556/hme-manager`；MIT 授權；logo 在 `static/logo.svg`。文案語氣：務實、精確、短句、繁體中文。無其他具約束力的視覺承諾。
+名稱 **HME Manager**；GitHub `WW-shan/hme-manager`；MIT 授權；logo 在 `static/logo.svg`。文案語氣：務實、精確、短句、繁體中文。無其他具約束力的視覺承諾。
 
 ## Evidence on Hand
 

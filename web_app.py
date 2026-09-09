@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 import auto_refresh
 from api_service import (
+    browser_status,
     create_alias,
     delete_alias,
     disable_alias,
@@ -85,6 +86,10 @@ def _h_session_import(manager, body, query, params):
     return import_session(manager, body)
 
 
+def _h_browser_status(manager, body, query, params):
+    return browser_status(manager)
+
+
 def _h_auto_refresh_get(manager, body, query, params):
     return ok_response(auto_refresh.status(manager))
 
@@ -137,6 +142,7 @@ ROUTES: tuple[tuple[str, re.Pattern[str], Handler], ...] = (
     ("GET", re.compile(r"^/v1/session/status$"), _h_session_status),
     ("POST", re.compile(r"^/v1/session/refresh$"), _h_session_refresh),
     ("POST", re.compile(r"^/v1/session/import$"), _h_session_import),
+    ("GET", re.compile(r"^/v1/browser/status$"), _h_browser_status),
     ("GET", re.compile(r"^/v1/auto-refresh$"), _h_auto_refresh_get),
     ("POST", re.compile(r"^/v1/auto-refresh$"), _h_auto_refresh_update),
     ("POST", re.compile(r"^/v1/auto-refresh/run$"), _h_auto_refresh_run),
