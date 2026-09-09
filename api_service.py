@@ -3,6 +3,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import re
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -81,7 +82,16 @@ def browser_status(manager: Any) -> dict[str, Any]:
     if result.get("lastError") is None:
         result.pop("lastError", None)
     elif "lastError" in result:
-        result["lastError"] = " ".join(str(result["lastError"]).split())[:300]
+        message = " ".join(str(result["lastError"]).split())
+        api_key = str(os.environ.get("HME_API_KEY", "") or "")
+        if api_key:
+            message = message.replace(api_key, "[redacted]")
+        message = re.sub(
+            r"(?i)(x-api-key|authorization|cookie|password|api[_-]?key)\s*[:=]\s*[^,\s]+",
+            r"\1=<redacted>",
+            message,
+        )
+        result["lastError"] = message[:300]
     return ok_response(result)
 
 

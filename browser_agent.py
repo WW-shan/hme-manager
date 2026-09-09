@@ -253,6 +253,18 @@ def build_har_request(request: Mapping[str, Any], cookies: list[Mapping[str, Any
         if isinstance(item, Mapping) and item.get("name")
     ]
     cookie_names = {item["name"] for item in cookie_items}
+    if not REQUIRED_COOKIE_NAMES.issubset(cookie_names):
+        request_cookie = next(
+            (str(value) for name, value in headers.items() if str(name).lower() == "cookie" and value),
+            "",
+        )
+        parsed_header_cookies = []
+        for part in request_cookie.split(";"):
+            name, separator, value = part.strip().partition("=")
+            if separator and name and name not in cookie_names:
+                parsed_header_cookies.append({"name": name, "value": value})
+        cookie_items.extend(parsed_header_cookies)
+        cookie_names = {item["name"] for item in cookie_items}
     missing = sorted(REQUIRED_COOKIE_NAMES - cookie_names)
     if missing:
         raise RuntimeError("browser session cookies unavailable")

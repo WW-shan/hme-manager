@@ -68,6 +68,19 @@ class BrowserAgentTests(unittest.TestCase):
                 [],
             )
 
+    def test_build_har_request_falls_back_to_cookie_header(self):
+        header_cookie = "; ".join(f"{item['name']}={item['value']}" for item in self.cookies)
+        har = browser_agent.build_har_request(
+            {
+                "url": "https://p119-maildomainws.icloud.com/v2/hme/list",
+                "headers": {"Cookie": header_cookie},
+            },
+            [],
+        )
+
+        request = json.loads(har)["log"]["entries"][0]["request"]
+        self.assertEqual({item["name"] for item in request["cookies"]}, browser_agent.REQUIRED_COOKIE_NAMES)
+
     def test_find_hme_request_uses_raw_webdriver_log_command(self):
         driver = FakeDriver([performance_entry()])
 
