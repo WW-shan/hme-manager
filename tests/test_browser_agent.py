@@ -141,6 +141,16 @@ class BrowserAgentTests(unittest.TestCase):
         if browser_agent.MANAGER_KEY:
             self.assertNotIn(browser_agent.MANAGER_KEY, detail)
 
+    def test_import_pending_request_imports_a_new_request_while_manager_session_is_valid(self):
+        driver = FakeDriver([performance_entry()])
+        with patch.object(browser_agent, "_all_cookies", return_value=self.cookies), \
+                patch.object(browser_agent, "import_har", return_value=(True, "china")), \
+                patch.object(browser_agent, "write_status"):
+            ok, detail = browser_agent._import_pending_request(driver, set())
+
+        self.assertTrue(ok)
+        self.assertEqual(detail, "china")
+
     def test_write_status_uses_atomic_secret_free_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
             status_path = Path(tmp) / "state" / "browser-agent.json"

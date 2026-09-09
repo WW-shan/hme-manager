@@ -370,35 +370,46 @@ def _heartbeat(driver: Any) -> None:
         raise RuntimeError("browser session is no longer available") from exc
 
 
-def capture_and_import(driver: Any, navigate: bool = True) -> tuple[bool, str]:
+def _import_pending_request(driver: Any, seen_request_ids: set[str]) -> tuple[bool, str]:
+    request = find_hme_request(driver, seen_request_ids)
+    if not request:
+        return False, ""
+    try:
+        har_text = build_har_request(request, _all_cookies(driver))
+    except RuntimeError as exc:
+        write_status(phase="waiting_for_session_cookies", lastError=_safe_message(exc))
+        return False, ""
+    ok, detail = import_har(har_text)
+    if ok:
+        write_status(
+            phase="imported",
+            lastImportAt=time.time(),
+            lastError=None,
+            region=detail,
+        )
+        print(f"[hme-browser-agent] Session 已自动导入（region={detail}）", flush=True)
+        return True, detail
+    write_status(phase="import_rejected", lastError=detail)
+    print(f"[hme-browser-agent] Session 导入失败：{detail}", flush=True)
+    return False, detail
+
+
+def capture_and_import(
+    driver: Any,
+    navigate: bool = True,
+    seen_request_ids: set[str] | None = None,
+) -> tuple[bool, str]:
     if navigate:
         write_status(phase="opening_icloud", lastError=None)
         driver.get(ICLOUD_URL)
     print("[hme-browser-agent] 请在 noVNC 页面完成 iCloud 登录/2FA，并打开 Hide My Email", flush=True)
     write_status(phase="waiting_for_login_or_hme", lastError=None)
     deadline = time.time() + CAPTURE_TIMEOUT
-    seen_request_ids: set[str] = set()
+    seen_request_ids = seen_request_ids if seen_request_ids is not None else set()
     while time.time() < deadline:
-        request = find_hme_request(driver, seen_request_ids)
-        if request:
-            try:
-                har_text = build_har_request(request, _all_cookies(driver))
-            except RuntimeError as exc:
-                write_status(phase="waiting_for_session_cookies", lastError=_safe_message(exc))
-                time.sleep(2)
-                continue
-            ok, detail = import_har(har_text)
-            if ok:
-                write_status(
-                    phase="imported",
-                    lastImportAt=time.time(),
-                    lastError=None,
-                    region=detail,
-                )
-                print(f"[hme-browser-agent] Session 已自动导入（region={detail}）", flush=True)
-                return True, detail
-            write_status(phase="import_rejected", lastError=detail)
-            print(f"[hme-browser-agent] Session 导入失败：{detail}", flush=True)
+        imported, detail = _import_pending_request(driver, seen_request_ids)
+        if imported:
+            return True, detail
         time.sleep(1)
     write_status(phase="capture_timeout", lastError="等待 iCloud HME 请求超时")
     return False, "capture timeout"
@@ -411,6 +422,7 @@ def run() -> None:
     browser_initialized = False
     last_import_at = 0.0
     last_log = ""
+    seen_request_ids: set[str] = set()
     try:
         while True:
             if driver is None:
@@ -459,13 +471,28 @@ def run() -> None:
                         except Exception as exc:
                             write_status(phase="validating_import", lastError=_safe_message(exc))
                     if not valid and (not last_import_at or time.time() - last_import_at >= 180):
-                        imported, _detail = capture_and_import(driver, navigate=True)
+                        imported, _detail = capture_and_import(
+                            driver,
+                            navigate=True,
+                            seen_request_ids=seen_request_ids,
+                        )
                         if imported:
                             last_import_at = time.time()
                             try:
                                 manager_refresh()
                             except Exception as exc:
                                 write_status(phase="imported_validating", lastError=_safe_message(exc))
+                else:
+                    # A fresh login can happen while the previous imported
+                    # session is still valid.  Pick up that request now rather
+                    # than waiting for the old cookie to expire first.
+                    imported, _detail = _import_pending_request(driver, seen_request_ids)
+                    if imported:
+                        last_import_at = time.time()
+                        try:
+                            manager_refresh()
+                        except Exception as exc:
+                            write_status(phase="imported_validating", lastError=_safe_message(exc))
 
                 _heartbeat(driver)
                 time.sleep(CHECK_INTERVAL)
