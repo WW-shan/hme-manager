@@ -189,6 +189,29 @@ def manager_refresh() -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
+def ensure_auto_refresh_enabled() -> None:
+    """Re-enable the keep-alive worker after a successful re-import.
+
+    The worker disables itself when Apple reports an expired session.  A
+    browser-assisted re-import is the recovery path, so leaving the worker
+    disabled would make the next expiry invisible to this agent.
+    """
+    status, payload = _http_json("GET", f"{MANAGER_URL}/v1/auto-refresh", timeout=20)
+    if status < 200 or status >= 300 or payload.get("ok") is False:
+        raise RuntimeError(_api_error(status, payload))
+    data = payload.get("data")
+    if isinstance(data, Mapping) and data.get("enabled") is True:
+        return
+    status, payload = _http_json(
+        "POST",
+        f"{MANAGER_URL}/v1/auto-refresh",
+        payload={"enabled": True},
+        timeout=20,
+    )
+    if status < 200 or status >= 300 or payload.get("ok") is False:
+        raise RuntimeError(_api_error(status, payload))
+
+
 def import_har(har_text: str) -> tuple[bool, str]:
     status, payload = _http_json(
         "POST",
@@ -480,6 +503,7 @@ def run() -> None:
                             last_import_at = time.time()
                             try:
                                 manager_refresh()
+                                ensure_auto_refresh_enabled()
                             except Exception as exc:
                                 write_status(phase="imported_validating", lastError=_safe_message(exc))
                 else:
@@ -491,8 +515,13 @@ def run() -> None:
                         last_import_at = time.time()
                         try:
                             manager_refresh()
+                            ensure_auto_refresh_enabled()
                         except Exception as exc:
                             write_status(phase="imported_validating", lastError=_safe_message(exc))
+                    try:
+                        ensure_auto_refresh_enabled()
+                    except Exception as exc:
+                        write_status(phase="auto_refresh_check_failed", lastError=_safe_message(exc))
 
                 _heartbeat(driver)
                 time.sleep(CHECK_INTERVAL)

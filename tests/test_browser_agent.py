@@ -151,6 +151,20 @@ class BrowserAgentTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(detail, "china")
 
+    def test_ensure_auto_refresh_enabled_recovers_a_disabled_worker(self):
+        with patch.object(
+            browser_agent,
+            "_http_json",
+            side_effect=[
+                (200, {"ok": True, "data": {"enabled": False}}),
+                (200, {"ok": True, "data": {"enabled": True}}),
+            ],
+        ) as request_mock:
+            browser_agent.ensure_auto_refresh_enabled()
+
+        self.assertEqual(request_mock.call_count, 2)
+        self.assertEqual(request_mock.call_args_list[1].args[0], "POST")
+
     def test_write_status_uses_atomic_secret_free_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
             status_path = Path(tmp) / "state" / "browser-agent.json"
